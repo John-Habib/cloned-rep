@@ -35,7 +35,6 @@ try:
 except ImportError:
     NO_DRILL_SHAPE = PCB_PLOT_PARAMS.NO_DRILL_SHAPE
 
-from .helpers import get_exclude_from_pos
 
 
 class Fabrication:
@@ -241,7 +240,7 @@ class Fabrication:
                         continue
                     filePath = os.path.join(folderName, filename)
                     zipfile.write(filePath, os.path.basename(filePath))
-        self.logger.info("Finished generating ZIP file")
+        self.logger.info("Finished generating ZIP file %s", os.path.join(self.outputdir, zipname))
 
     def generate_cpl(self):
         """Generate placement file (CPL)."""
@@ -258,9 +257,12 @@ class Fabrication:
             writer.writerow(
                 ["Designator", "Val", "Package", "Mid X", "Mid Y", "Rotation", "Layer"]
             )
-            for part in self.parent.store.read_pos_parts():
-                fp = self.board.FindFootprintByReference(part[0])
-                if get_exclude_from_pos(fp):
+            footprints = sorted(self.board.Footprints(), key = lambda x: x.GetReference())
+            for fp in footprints:
+                part = self.parent.store.get_part(fp.GetReference())
+                if not part: # No matching part in the database, continue
+                    continue
+                if part[6] == 1: # Exclude from POS
                     continue
                 if not add_without_lcsc and not part[3]:
                     continue
@@ -276,7 +278,8 @@ class Fabrication:
                         "top" if fp.GetLayer() == 0 else "bottom",
                     ]
                 )
-        self.logger.info("Finished generating CPL file")
+        self.logger.info("Finished generating CPL file %s", os.path.join(self.outputdir, cplname))
+
 
     def generate_bom(self):
         """Generate BOM file."""
@@ -293,4 +296,4 @@ class Fabrication:
                 if not add_without_lcsc and not part[3]:
                     continue
                 writer.writerow(part)
-        self.logger.info("Finished generating BOM file")
+        self.logger.info("Finished generating BOM file %s", os.path.join(self.outputdir, bomname))
